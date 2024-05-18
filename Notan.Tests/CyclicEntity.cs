@@ -8,13 +8,12 @@ namespace Notan.Tests;
 public partial struct CyclicEntity : IEntity<CyclicEntity>
 {
     [Serialize]
-    [HandleIs(typeof(CyclicEntity))]
-    public Handle Self;
+    public Handle<CyclicEntity> Self;
 
     private sealed class Associated : Associated<CyclicEntity>
     {
         public override void OnDestroy(Handle<CyclicEntity> handle, ref CyclicEntity entity)
-            => entity.Self.Server<CyclicEntity>().Destroy();
+            => entity.Self.Server().Destroy();
 
         public override void PostUpdate(Handle<CyclicEntity> handle, ref CyclicEntity entity)
             => entity.Self = handle;

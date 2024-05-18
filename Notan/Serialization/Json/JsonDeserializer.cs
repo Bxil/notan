@@ -4,17 +4,11 @@ using System.Text.Json;
 
 namespace Notan.Serialization.Json;
 
-public readonly struct JsonDeserializer : IDeserializer<JsonDeserializer>
+public readonly struct JsonDeserializer(World world, Stream stream) : IDeserializer<JsonDeserializer>
 {
-    public World World { get; }
+    public World World { get; } = world;
 
-    private readonly JsonStream stream;
-
-    public JsonDeserializer(World world, Stream stream)
-    {
-        World = world;
-        this.stream = new(stream);
-    }
+    private readonly JsonStream stream = new(stream);
 
     public void Deserialize(ref bool value) => value = stream.Read().GetBoolean();
 
@@ -97,20 +91,15 @@ public readonly struct JsonDeserializer : IDeserializer<JsonDeserializer>
         return this;
     }
 
-    private class JsonStream
+    private class JsonStream(Stream stream)
     {
-        private readonly Stream stream;
+        private readonly Stream stream = stream;
         private byte[] buffer = new byte[Environment.SystemPageSize];
         private int len = 0;
 
         private int consume = 0;
 
         private JsonReaderState state = new();
-
-        public JsonStream(Stream stream)
-        {
-            this.stream = stream;
-        }
 
         //After this call get a token, and do nothing else with the reader
         public Utf8JsonReader Read(bool consume = true)

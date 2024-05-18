@@ -3,11 +3,9 @@ using System.Text.Json;
 
 namespace Notan.Serialization.Json;
 
-public readonly struct JsonSerializer : ISerializer<JsonSerializer>
+public readonly struct JsonSerializer(Utf8JsonWriter writer) : ISerializer<JsonSerializer>
 {
-    private readonly Utf8JsonWriter writer;
-
-    public JsonSerializer(Utf8JsonWriter writer) => this.writer = writer;
+    private readonly Utf8JsonWriter writer = writer;
 
     public void Serialize(byte value) => writer.WriteNumberValue(value);
 

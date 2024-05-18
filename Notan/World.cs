@@ -12,7 +12,7 @@ namespace Notan;
 
 public abstract class World
 {
-    private protected readonly Dictionary<string, Storage> TypeNameToStorage = new();
+    private protected readonly Dictionary<string, Storage> TypeNameToStorage = [];
     internal FastList<Storage> IdToStorage = new(); //Element 0 is always null.
 
     public IPEndPoint EndPoint { get; protected set; } = null!;

@@ -5,14 +5,9 @@ using System.Text.Unicode;
 
 namespace Notan.Serialization;
 
-public readonly ref struct Key
+public readonly ref struct Key(ReadOnlySpan<byte> utf8)
 {
-    private readonly ReadOnlySpan<byte> utf8;
-
-    public Key(ReadOnlySpan<byte> utf8)
-    {
-        this.utf8 = utf8;
-    }
+    private readonly ReadOnlySpan<byte> utf8 = utf8;
 
     public static bool operator ==(Key left, string right)
     {

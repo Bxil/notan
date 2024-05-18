@@ -17,16 +17,3 @@ internal sealed class SerializeAttribute : Attribute
         Name = name;
     }
 }
-
-[AttributeUsage(AttributeTargets.Field)]
-internal sealed class HandleIsAttribute : Attribute
-{
-    public Type Type { get; }
-    public bool MakeProperty { get; }
-
-    public HandleIsAttribute(Type type, bool makeProperty = false)
-    {
-        Type = type;
-        MakeProperty = makeProperty;
-    }
-}

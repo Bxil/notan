@@ -5,7 +5,6 @@ namespace Notan.Tests;
 [GenerateSerialization]
 partial struct WeakHandleEntity : IEntity<WeakHandleEntity>
 {
-    [Serialize(nameof(Value))]
-    [HandleIs(typeof(ByteEntity), true)]
-    private Handle handle;
+    [Serialize]
+    private Handle Handle;
 }

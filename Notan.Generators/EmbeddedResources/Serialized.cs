@@ -5,7 +5,7 @@ using System.IO;
 __NAMESPACE__
 
 partial __STRUCTTYPE__ __TYPENAME__
-{__PROPERTIES__
+{
     void ISerializable.Serialize<T>(T serializer)
     {
         __SERIALIZE__

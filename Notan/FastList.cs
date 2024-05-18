@@ -8,7 +8,7 @@ namespace Notan;
 
 internal struct FastList<T>
 {
-    private T[] array = Array.Empty<T>();
+    private T[] array = [];
     public int Count { get; private set; } = 0;
 
     public FastList() { }
@@ -28,7 +28,7 @@ internal struct FastList<T>
         {
             return;
         }
-        
+
         if (currentcapacity == 0)
         {
             currentcapacity = 8;
@@ -70,13 +70,13 @@ internal struct FastList<T>
         if (Count == 0)
         {
             ArrayPool<T>.Shared.Return(array);
-            array = Array.Empty<T>();
+            array = [];
         }
     }
 
     public bool Remove(T value)
     {
-        var index = Array.IndexOf(array ?? Array.Empty<T>(), value);
+        var index = Array.IndexOf(array ?? [], value);
         if (index != -1)
         {
             RemoveAt(index);
@@ -88,7 +88,7 @@ internal struct FastList<T>
         }
     }
 
-    public int IndexOf(T item) => Array.IndexOf(array ?? Array.Empty<T>(), item, 0, Count);
+    public int IndexOf(T item) => Array.IndexOf(array ?? [], item, 0, Count);
 
     public ref T this[int index]
     {
@@ -99,5 +99,5 @@ internal struct FastList<T>
         }
     }
 
-    public Span<T> AsSpan() => (array ?? Array.Empty<T>()).AsSpan(0, Count);
+    public Span<T> AsSpan() => (array ?? []).AsSpan(0, Count);
 }

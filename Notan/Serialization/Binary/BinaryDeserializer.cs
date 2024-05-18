@@ -5,19 +5,13 @@ using System.Text;
 
 namespace Notan.Serialization.Binary;
 
-public readonly struct BinaryDeserializer : IDeserializer<BinaryDeserializer>
+public readonly struct BinaryDeserializer(World world, Stream stream) : IDeserializer<BinaryDeserializer>
 {
-    public World World { get; }
+    public World World { get; } = world;
 
-    private readonly BinaryReader reader;
+    private readonly BinaryReader reader = new(stream, Encoding.UTF8, true);
 
     private readonly StrongBox<byte[]> buffer = new(new byte[64]);
-
-    public BinaryDeserializer(World world, Stream stream)
-    {
-        World = world;
-        reader = new BinaryReader(stream, Encoding.UTF8, true);
-    }
 
     public void Deserialize(ref bool value)
     {

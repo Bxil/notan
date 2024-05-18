@@ -75,7 +75,6 @@ public record struct Handle : ISerializable
     }
 }
 
-//Beware of https://github.com/dotnet/runtime/issues/6924
 public record struct Handle<T> : ISerializable where T : struct, IEntity<T>
 {
     public Storage<T>? Storage { get; }
@@ -226,11 +225,9 @@ public record struct ClientHandle<T> : ISerializable where T : struct, IEntity<T
     }
 }
 
-public struct Maybe<T> : ISerializable where T : struct, IEntity<T>
+public struct Maybe<T>(Handle<T> handle) : ISerializable where T : struct, IEntity<T>
 {
-    private Handle<T> handle;
-
-    public Maybe(Handle<T> handle) => this.handle = handle;
+    private Handle<T> handle = handle;
 
     public bool Alive() => handle.Storage?.Alive(handle.Index, handle.Generation) ?? false;
 

@@ -3,11 +3,9 @@ using System.Text;
 
 namespace Notan.Serialization.Binary;
 
-public readonly struct BinarySerializer : ISerializer<BinarySerializer>
+public readonly struct BinarySerializer(Stream stream) : ISerializer<BinarySerializer>
 {
-    private readonly BinaryWriter writer;
-
-    public BinarySerializer(Stream stream) => writer = new BinaryWriter(stream, Encoding.UTF8, true);
+    private readonly BinaryWriter writer = new(stream, Encoding.UTF8, true);
 
     public void Serialize(bool value)
     {

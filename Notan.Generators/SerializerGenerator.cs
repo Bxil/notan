@@ -30,12 +30,9 @@ public class SerializerGenerator : ISourceGenerator
         }
 
         var serializeAttribute = context.Compilation.GetTypeByMetadataName("Notan.Serialization.SerializeAttribute")!;
-        var handleIsAttribute = context.Compilation.GetTypeByMetadataName("Notan.Serialization.HandleIsAttribute")!;
-        var handleType = context.Compilation.GetTypeByMetadataName("Notan.Handle")!;
 
         var text = new StreamReader(Assembly.GetExecutingAssembly().GetManifestResourceStream("Notan.Generators.EmbeddedResources.Serialized.cs")).ReadToEnd();
 
-        var propertiesBuilder = new StringBuilder();
         var serializeBuilder = new StringBuilder();
         var deserializeBuilder = new StringBuilder();
         foreach (var serialized in receiver.Serialized)
@@ -57,13 +54,6 @@ public class SerializerGenerator : ISourceGenerator
                     continue;
                 }
 
-                if (field.TryGetAttribute(handleIsAttribute, out var handleIsData) && (bool)handleIsData.ConstructorArguments[1].Value! && field.Type.Equals(handleType, SymbolEqualityComparer.Default))
-                {
-                    var propertyName = (string)serializeData.ConstructorArguments[0].Value!;
-                    var typeString = ((INamedTypeSymbol)handleIsData.ConstructorArguments[0].Value!).ToDisplayString();
-                    _ = propertiesBuilder.AppendLine().AppendLine($"    public Handle<{typeString}> {propertyName} {{ get => {field.Name}.Strong<{typeString}>(); set => {field.Name} = value; }}");
-                }
-
                 var name = $"\"{(string?)serializeData.ConstructorArguments[0].Value ?? field.Name}\"";
                 _ = deserializeBuilder.Append($"if (key == {name}) ");
                 _ = serializeBuilder.AppendLine($"serializer.ObjectNext({name}).Serialize({field.Name});");
@@ -78,13 +68,11 @@ public class SerializerGenerator : ISourceGenerator
             var formatted = text
                 .Replace("__NAMESPACE__", nspace)
                 .Replace("__STRUCTTYPE__", structtype)
-                .Replace("__PROPERTIES__", propertiesBuilder.ToString())
                 .Replace("__SERIALIZE__", serializeBuilder.ToString())
                 .Replace("__DESERIALIZE__", deserializeBuilder.ToString())
                 .Replace("__TYPENAME__", serialized.Name);
 
             context.AddSource($"{serialized.ToDisplayString()}.g.cs", formatted);
-            _ = propertiesBuilder.Clear();
             _ = serializeBuilder.Clear();
             _ = deserializeBuilder.Clear();
         }
