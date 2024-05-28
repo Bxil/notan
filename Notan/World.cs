@@ -5,8 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace Notan;
@@ -15,6 +18,8 @@ public abstract class World
 {
     private protected readonly Dictionary<string, Storage> TypeNameToStorage = [];
     internal FastList<Storage> IdToStorage = new(); //Element 0 is always null.
+
+    private protected static string certificateName = "Notan";
 
     public IPEndPoint EndPoint { get; protected set; } = null!;
 
@@ -34,9 +39,11 @@ public abstract class World
     public abstract void AddStorage<T>(StorageOptionsAttribute? options = default) where T : struct, IEntity<T>;
 }
 
-public sealed class ServerWorld : World
+public sealed class ServerWorld : World, IDisposable
 {
     private readonly TcpListener listener;
+
+    private FastList<(TcpClient, SslStream, Task)> clientsPendingSslAuth = new();
 
     private FastList<Client> clients = new();
     public Span<Client> Clients => clients.AsSpan();
@@ -44,11 +51,23 @@ public sealed class ServerWorld : World
     private int nextClientId = 0;
     private readonly Stack<int> clientIds = new();
 
-    public ServerWorld(int port)
+    private readonly X509Certificate2 certificate;
+
+    public ServerWorld(int port) : this(port, CreateTemporaryCertificate()) { }
+
+    public ServerWorld(int port, X509Certificate2 certificate)
     {
+        this.certificate = certificate;
+
         listener = TcpListener.Create(port);
         listener.Start();
         EndPoint = (IPEndPoint)listener.LocalEndpoint;
+    }
+
+    public void Dispose()
+    {
+        Exit();
+        certificate.Dispose();
     }
 
     public override void AddStorage<T>(StorageOptionsAttribute? options = default)
@@ -78,15 +97,34 @@ public sealed class ServerWorld : World
 
         while (listener.Pending())
         {
-            if (!clientIds.TryPop(out var id))
-            {
-                id = nextClientId;
-                nextClientId++;
-            }
-            clients.Add(new(this, listener.AcceptTcpClient(), id));
+            var tcpClient = listener.AcceptTcpClient();
+            var stream = new SslStream(tcpClient.GetStream());
+            var task = stream.AuthenticateAsServerAsync(certificate);
+            clientsPendingSslAuth.Add((tcpClient, stream, task));
         }
 
-        var i = clients.Count;
+        var i = clientsPendingSslAuth.Count;
+        while (i > 0)
+        {
+            i--;
+            var (tcpClient, stream, task) = clientsPendingSslAuth[i];
+            if (!task.IsCompleted)
+            {
+                continue;
+            }
+            if (task.IsCompletedSuccessfully)
+            {
+                if (!clientIds.TryPop(out var id))
+                {
+                    id = nextClientId;
+                    nextClientId++;
+                }
+                clients.Add(new(this, tcpClient, stream, id));
+            }
+            clientsPendingSslAuth.RemoveAt(i);
+        }
+
+        i = clients.Count;
         while (i > 0)
         {
             i--;
@@ -212,23 +250,39 @@ public sealed class ServerWorld : World
 
         IdToStorage = idToStorageSaved;
     }
+
+    private static X509Certificate2 CreateTemporaryCertificate()
+    {
+        var rsa = RSA.Create();
+        var certtmp = new CertificateRequest($"cn={certificateName}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now + TimeSpan.FromDays(1));
+        // The certificate must be reimported as Windows does not allow ephemeral keys
+        // https://stackoverflow.com/questions/75890480
+        return new X509Certificate2(certtmp.Export(X509ContentType.Pkcs12));
+    }
 }
 
 public sealed class ClientWorld : World
 {
     private readonly Client server;
 
-    private ClientWorld(TcpClient server)
+    private ClientWorld(TcpClient server, SslStream stream)
     {
-        this.server = new Client(this, server, 0);
+        this.server = new Client(this, server, stream, 0);
         EndPoint = (IPEndPoint)server.Client.LocalEndPoint!;
     }
 
-    public static async Task<ClientWorld> StartAsync(string host, int port)
+    public static async Task<ClientWorld> StartAsync(string host, int port) => await StartAsync(host, port, certificateName);
+
+    public static async Task<ClientWorld> StartAsync(string host, int port, string serverName)
     {
         var client = new TcpClient();
         await client.ConnectAsync(host, port);
-        return new ClientWorld(client);
+        var stream = new SslStream(client.GetStream(), false, ValidateCertificate);
+        await stream.AuthenticateAsClientAsync(serverName);
+        return new ClientWorld(client, stream);
+
+        //TODO
+        static bool ValidateCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors) => true;
     }
 
     public override void AddStorage<T>(StorageOptionsAttribute? options = default)

@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Notan.Reflection;
+using Notan.Tests.Utility;
 using System.Reflection;
 
 namespace Notan.Tests;
@@ -17,13 +18,21 @@ public class Authority
         serverWorld = new ServerWorld(0);
         serverWorld.AddStorages(Assembly.GetExecutingAssembly());
 
-        clientWorld1 = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port).Result;
+        var client1Task = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port);
+
+        var client2Task = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port);
+
+        while (!client1Task.IsCompleted || !client2Task.IsCompleted)
+        {
+            _ = serverWorld.Tick();
+        }
+        Assert.IsTrue(client1Task.IsCompletedSuccessfully);
+        Assert.IsTrue(client2Task.IsCompletedSuccessfully);
+
+        clientWorld1 = client1Task.Result;
         clientWorld1.AddStorages(Assembly.GetExecutingAssembly());
-
-        clientWorld2 = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port).Result;
+        clientWorld2 = client2Task.Result;
         clientWorld2.AddStorages(Assembly.GetExecutingAssembly());
-
-        _ = serverWorld.Tick();
     }
 
     [TestCleanup]
@@ -35,6 +44,8 @@ public class Authority
         _ = clientWorld1.Tick();
         clientWorld2.Exit();
         _ = clientWorld2.Tick();
+
+        serverWorld.Dispose();
     }
 
     [TestMethod]
@@ -49,9 +60,12 @@ public class Authority
         _ = clientWorld1.Tick();
         _ = clientWorld2.Tick();
 
-        _ = serverWorld.Tick(); //2, 4
+        AssertUntil.True(() =>
+        {
+            _ = serverWorld.Tick(); //2, 4
 
-        Assert.AreEqual(6, serverWorld.GetStorage<ByteEntity>().Run(new SumSystem()).Sum);
+            return 6 == serverWorld.GetStorage<ByteEntity>().Run(new SumSystem()).Sum;
+        });
 
         _ = clientWorld1.Tick(); //3
         _ = clientWorld2.Tick(); //5
@@ -59,22 +73,27 @@ public class Authority
         _ = storage1.Run(new IncSystem()); //4
         _ = storage2.Run(new IncSystem()); //6
 
-        _ = clientWorld1.Tick();
-        _ = clientWorld2.Tick();
+        AssertUntil.True(() =>
+        {
+            _ = clientWorld1.Tick();
+            _ = clientWorld2.Tick();
 
-        _ = serverWorld.Tick(); //5, 7
+            _ = serverWorld.Tick(); //5, 7
 
-        Assert.AreEqual(12, serverWorld.GetStorage<ByteEntity>().Run(new SumSystem()).Sum);
+            return 12 == serverWorld.GetStorage<ByteEntity>().Run(new SumSystem()).Sum;
+        });
 
         _ = serverWorld.GetStorage<ByteEntity>().Run(new DestroySystem());
 
         _ = serverWorld.Tick();
 
-        _ = clientWorld1.Tick();
-        _ = clientWorld2.Tick();
+        AssertUntil.True(() =>
+        {
+            _ = clientWorld1.Tick();
+            _ = clientWorld2.Tick();
 
-        Assert.AreEqual(0, storage1.Run(new SumSystem()).Sum);
-        Assert.AreEqual(0, storage2.Run(new SumSystem()).Sum);
+            return 0 == storage1.Run(new SumSystem()).Sum && 0 == storage2.Run(new SumSystem()).Sum;
+        });
     }
 
     struct IncSystem : IClientSystem<ByteEntity>

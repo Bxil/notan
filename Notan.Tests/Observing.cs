@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Notan.Reflection;
+using Notan.Tests.Utility;
 using System;
 using System.IO;
 using System.Reflection;
@@ -18,10 +19,14 @@ public class Observing
         serverWorld = new ServerWorld(0);
         serverWorld.AddStorages(Assembly.GetExecutingAssembly());
 
-        clientWorld = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port).Result;
+        var clientTask = ClientWorld.StartAsync("localhost", serverWorld.EndPoint.Port);
+        while (!clientTask.IsCompleted)
+        {
+            _ = serverWorld.Tick();
+        }
+        Assert.IsTrue(clientTask.IsCompletedSuccessfully);
+        clientWorld = clientTask.Result;
         clientWorld.AddStorages(Assembly.GetExecutingAssembly());
-
-        _ = serverWorld.Tick();
     }
 
     [TestCleanup]
@@ -53,16 +58,22 @@ public class Observing
     {
         clientWorld.GetStorage<MalformedEntity>().RequestCreate(new MalformedEntity());
         _ = clientWorld.Tick();
-        _ = serverWorld.Tick();
-        Assert.AreEqual(0, serverWorld.Clients.Length);
+        AssertUntil.True(() =>
+        {
+            _ = serverWorld.Tick();
+            return 0 == serverWorld.Clients.Length;
+        });
     }
 
     [TestMethod]
     public void MalformedWrong()
     {
         clientWorld.GetStorage<MalformedEntityWrong>().RequestCreate(new MalformedEntityWrong());
-        _ = clientWorld.Tick();
-        _ = Assert.ThrowsException<Exception>(() => _ = serverWorld.Tick());
+        AssertUntil.Throw(() =>
+        {
+            _ = clientWorld.Tick();
+            _ = Assert.ThrowsException<Exception>(() => _ = serverWorld.Tick());
+        });
     }
 
     [TestMethod]
@@ -83,8 +94,12 @@ public class Observing
         handle2.AddObserver(serverWorld.Clients[0]);
         Assert.IsTrue(new Maybe<HandleEntity>(handle2).Alive());
         _ = serverWorld.Tick();
-        _ = clientWorld.Tick();
-        Assert.AreEqual(1, clientWorld.GetStorage<HandleEntity>().Run(new AliveCountSystem()).Count);
+
+        AssertUntil.True(() =>
+        {
+            _ = clientWorld.Tick();
+            return 1 == clientWorld.GetStorage<HandleEntity>().Run(new AliveCountSystem()).Count;
+        });
     }
 
     struct ByteSystem : IServerSystem<ByteEntity>
