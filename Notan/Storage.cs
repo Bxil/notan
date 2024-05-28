@@ -1,4 +1,5 @@
-﻿using Notan.Reflection;
+﻿using Notan.Collections;
+using Notan.Reflection;
 using Notan.Serialization;
 using System;
 using System.IO;
